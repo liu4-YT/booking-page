@@ -1,87 +1,68 @@
 from flask import Flask, request, jsonify
-import json, time, urllib.request
+import time, urllib.request, json
 
 app = Flask(__name__)
 
-FEISHU_APP_ID = 'cli_aaeacecbf47a9bc0'
-FEISHU_APP_SECRET = 'UmiNOo8IHbFIb1iLwEaa8gNreIem2nVD'
-BASE_ID = 'QXazbngDbamnwGsMjEbc58TGnDh'
-TABLE_ID = 'tblRD66BfFKmKQQl'
-
-_token = None
-_token_expire = 0
-
-
-def get_token():
-    global _token, _token_expire
-    now = time.time()
-    if _token and now < _token_expire - 60:
-        return _token
-    data = json.dumps({'app_id': FEISHU_APP_ID, 'app_secret': FEISHU_APP_SECRET}).encode()
-    req = urllib.request.Request(
-        'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
-        data=data,
-        headers={'Content-Type': 'application/json; charset=utf-8'}
-    )
-    resp = urllib.request.urlopen(req, timeout=10)
-    body = json.loads(resp.read())
-    _token = body['tenant_access_token']
-    _token_expire = now + body.get('expire', 7200)
-    return _token
+# 飞书配置
+FS = {
+    'id': 'cli_aaeacecbf47a9bc0',
+    'sk': 'UmiNOo8IHbFIb1iLwEaa8gNreIem2nVD',
+    'base': 'QXazbngDbamnwGsMjEbc58TGnDh',
+    'tbl': 'tblRD66BfFKmKQQl'
+}
+_tk = [None, 0]
 
 
-def write_feishu(data):
-    token = get_token()
-    body = {
-        'fields': {
-            '称呼': (data.get('name') or '').strip(),
-            '电话': (data.get('phone') or '').strip(),
-            '项目': (data.get('roomName') or '').strip(),
-            '日期': (data.get('date') or '').strip(),
-            '时间': (data.get('time') or '').strip(),
-            '人数': _to_int(data.get('people')),
-            '备注': (data.get('remark') or '').strip()
-        }
-    }
-    url = f'https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{TABLE_ID}/records'
-    req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers={
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json; charset=utf-8'
-    })
-    resp = urllib.request.urlopen(req, timeout=10)
-    return json.loads(resp.read())
+def _token():
+    if _tk[0] and time.time() < _tk[1] - 60:
+        return _tk[0]
+    d = json.dumps({'app_id': FS['id'], 'app_secret': FS['sk']}).encode()
+    r = urllib.request.Request('https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
+                               data=d, headers={'Content-Type': 'application/json; charset=utf-8'})
+    b = json.loads(urllib.request.urlopen(r, timeout=10).read())
+    _tk[0] = b['tenant_access_token']
+    _tk[1] = time.time() + b.get('expire', 7200)
+    return _tk[0]
 
 
-def _to_int(v):
-    try:
-        return int(v)
-    except (ValueError, TypeError):
-        return 0
-
-
-@app.after_request
-def add_cors(resp):
-    resp.headers['Access-Control-Allow-Origin'] = '*'
-    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-    resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS, GET'
-    return resp
-
-
-@app.route('/api/booking', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/api/booking', methods=['POST', 'OPTIONS'])
 def booking():
     if request.method == 'OPTIONS':
-        return ('', 204)
-    if request.method == 'GET':
-        return jsonify({'status': 'ok'})
+        r = jsonify({})
+        r.headers['Access-Control-Allow-Origin'] = '*'
+        r.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        r.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        return r, 204
 
-    data = request.get_json(silent=True) or {}
-    phone = (data.get('phone') or '').strip()
-    room = (data.get('roomName') or '').strip()
+    d = request.get_json(silent=True) or {}
+    phone = (d.get('phone') or '').strip()
+    room = (d.get('roomName') or '').strip()
     if not phone or not room:
-        return jsonify({'code': -1, 'msg': '电话和项目不能为空'}), 400
+        r = jsonify({'code': -1, 'msg': '电话和项目不能为空'})
+        r.headers['Access-Control-Allow-Origin'] = '*'
+        return r, 400
 
     try:
-        write_feishu(data)
-        return jsonify({'code': 0, 'msg': '预约成功'})
+        tk = _token()
+        body = json.dumps({'fields': {
+            '称呼': (d.get('name') or '').strip(),
+            '电话': phone,
+            '项目': room,
+            '日期': (d.get('date') or '').strip(),
+            '时间': (d.get('time') or '').strip(),
+            '人数': int(d.get('people', 0) or 0),
+            '备注': (d.get('remark') or '').strip()
+        }}).encode('utf-8')
+        url = f'https://open.feishu.cn/open-apis/bitable/v1/apps/{FS["base"]}/tables/{FS["tbl"]}/records'
+        req = urllib.request.Request(url, data=body, headers={
+            'Authorization': f'Bearer {tk}',
+            'Content-Type': 'application/json; charset=utf-8'
+        })
+        urllib.request.urlopen(req, timeout=10)
+        r = jsonify({'code': 0, 'msg': '预约成功'})
+        r.headers['Access-Control-Allow-Origin'] = '*'
+        return r
     except Exception as e:
-        return jsonify({'code': -1, 'msg': str(e)}), 500
+        r = jsonify({'code': -1, 'msg': str(e)})
+        r.headers['Access-Control-Allow-Origin'] = '*'
+        return r, 500
