@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>预约订场</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <div class="page">
+        <header class="header">
+            <div class="header__content">
+                <h1 class="header__title" id="storeName">书答水</h1>
+                <p class="header__subtitle" id="slogan">选择你想要的娱乐空间，提前锁定快乐</p>
+            </div>
+        </header>
+
+        <main class="main">
+            <section class="room-list" id="roomList">
+                <!-- 数据由 script.js 中的 rooms 配置渲染 -->
+            </section>
+        </main>
+    </div>
+
+    <!-- 预约弹窗 -->
+    <div class="modal" id="bookingModal">
+        <div class="modal__overlay"></div>
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title" id="modalTitle">预约</h2>
+                <button class="modal__close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal__body">
+                <form class="booking-form" id="bookingForm">
+                    <div class="form-row">
+                        <label class="form-label" for="name">称呼</label>
+                        <input class="form-input" type="text" id="name" name="name" placeholder="请输入你的称呼" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label" for="phone">联系电话</label>
+                        <input class="form-input" type="tel" id="phone" name="phone" placeholder="请输入手机号码" required maxlength="11">
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label" for="date">预约日期</label>
+                        <input class="form-input" type="text" id="date" name="date" placeholder="请选择日期" readonly required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label" for="time">到店时间</label>
+                        <select class="form-input" id="time" name="time" required>
+                            <option value="">请选择时间段</option>
+                            <!-- 时段由 script.js 按表格动态生成 -->
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label" for="people">人数</label>
+                        <input class="form-input" type="number" id="people" name="people" min="1" placeholder="请输入人数" required>
+                    </div>
+                    <div class="form-row">
+                        <label class="form-label" for="remark">备注</label>
+                        <textarea class="form-input form-textarea" id="remark" name="remark" placeholder="如有特殊需求可在此填写"></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn">确认预约</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日期选择器（底部弹层，适配微信 X5） -->
+    <div class="sheet" id="dateSheet">
+        <div class="sheet__overlay"></div>
+        <div class="sheet__content">
+            <div class="sheet__header">
+                <span class="sheet__cancel">取消</span>
+                <span class="sheet__title">选择预约日期</span>
+                <span class="sheet__confirm" id="dateConfirm">确定</span>
+            </div>
+            <div class="date-grid" id="dateGrid"></div>
+        </div>
+    </div>
+
+    <!-- 轻提示 -->
+    <div class="toast" id="toast"></div>
+
+    <script src="./script.js"></script>
+</body>
+</html>

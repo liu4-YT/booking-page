@@ -1,0 +1,471 @@
+/* ========== 可调主题色（改这里即可统一换色）========== */
+:root {
+    --primary: #FF6B35;
+    --primary-dark: #E85A2A;
+    --header-gradient: linear-gradient(135deg, #FF8A5B 0%, #FF6B35 55%, #E85A2A 100%);
+    --bg: #F6F7F9;
+    --card: #FFFFFF;
+    --text-main: #1A1A1A;
+    --text-sub: #666666;
+    --text-hint: #999999;
+    --disabled-bg: #ECECEC;
+    --disabled-text: #AAAAAA;
+    --border: #EEEEEE;
+    --radius: 14px;
+    --shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text-main);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+.page {
+    min-height: 100vh;
+    padding-bottom: 24px;
+}
+
+/* ========== 顶部标题区（纯渐变，无需配图）========== */
+.header {
+    position: relative;
+    padding: 48px 24px 36px;
+    background: var(--header-gradient);
+    color: #fff;
+}
+
+.header__content {
+    position: relative;
+    z-index: 1;
+}
+
+.header__title {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+}
+
+.header__subtitle {
+    font-size: 14px;
+    opacity: 0.92;
+}
+
+/* ========== 主内容 ========== */
+.main {
+    padding: 20px 16px;
+}
+
+.room-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ========== 房间卡片 ========== */
+.room-card {
+    position: relative;
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px;
+    display: flex;
+    gap: 14px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
+}
+
+.room-card--available {
+    cursor: pointer;
+}
+
+.room-card--available:active {
+    transform: scale(0.98);
+}
+
+.room-card--disabled {
+    background: var(--disabled-bg);
+    opacity: 0.92;
+    cursor: not-allowed;
+}
+
+/* 图标占位块（替代图片） */
+.room-card__icon {
+    width: 76px;
+    height: 76px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    background: rgba(255, 107, 53, 0.10);
+}
+
+.room-card--disabled .room-card__icon {
+    background: rgba(0, 0, 0, 0.05);
+    filter: grayscale(0.85);
+    opacity: 0.75;
+}
+
+.room-card__info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+}
+
+.room-card__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.room-card__title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.room-card--disabled .room-card__title {
+    color: var(--disabled-text);
+}
+
+.room-card__tag {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.room-card__tag--available {
+    color: var(--primary);
+    background: rgba(255, 107, 53, 0.12);
+}
+
+.room-card__tag--disabled {
+    color: var(--disabled-text);
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.room-card__desc {
+    font-size: 13px;
+    color: var(--text-sub);
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.room-card--disabled .room-card__desc {
+    color: var(--text-hint);
+}
+
+.room-card__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+}
+
+.room-card__price {
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.room-card--disabled .room-card__price {
+    color: var(--disabled-text);
+}
+
+.room-card__hint {
+    color: var(--text-hint);
+    font-size: 12px;
+}
+
+/* 不可预约角标 */
+.disabled-watermark {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    font-size: 12px;
+    color: var(--disabled-text);
+    background: rgba(255, 255, 255, 0.7);
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+/* ========== 预约弹窗 ========== */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    align-items: flex-end;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.2s ease;
+}
+
+.modal__content {
+    position: relative;
+    width: 100%;
+    max-height: 82vh;
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    overflow: hidden;
+    animation: slideUp 0.25s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal__title {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.modal__close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: var(--text-hint);
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.modal__body {
+    padding: 18px 20px 28px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ========== 表单 ========== */
+.booking-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.form-input {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 15px;
+    color: var(--text-main);
+    background: #fff;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+    border-color: var(--primary);
+}
+
+.form-textarea {
+    height: 80px;
+    padding: 10px 14px;
+    resize: none;
+}
+
+.submit-btn {
+    width: 100%;
+    height: 48px;
+    margin-top: 6px;
+    border: none;
+    border-radius: 12px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.submit-btn:active {
+    background: var(--primary-dark);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+/* ========== 轻提示 Toast ========== */
+.toast {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.92);
+    background: rgba(0, 0, 0, 0.82);
+    color: #fff;
+    padding: 13px 22px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+    max-width: 78%;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 2000;
+}
+
+.toast--show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.toast--error {
+    background: rgba(220, 60, 50, 0.92);
+}
+
+.toast--success {
+    background: rgba(40, 160, 90, 0.94);
+}
+
+/* ========== 日期选择弹层 ========== */
+.sheet {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    align-items: flex-end;
+}
+
+.sheet.show {
+    display: flex;
+}
+
+.sheet__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    animation: fadeIn 0.2s ease;
+}
+
+.sheet__content {
+    position: relative;
+    width: 100%;
+    max-height: 72vh;
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    animation: slideUp 0.25s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.sheet__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+}
+
+.sheet__cancel {
+    font-size: 15px;
+    color: var(--text-hint);
+}
+
+.sheet__confirm {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.sheet__title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.date-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding: 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.date-cell {
+    border: 1px solid var(--border);
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.date-cell__label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.date-cell__sub {
+    font-size: 12px;
+    color: var(--text-sub);
+}
+
+.date-cell.active {
+    border-color: var(--primary);
+    background: rgba(255, 107, 53, 0.08);
+}
+
+.date-cell.active .date-cell__label,
+.date-cell.active .date-cell__sub {
+    color: var(--primary);
+}
