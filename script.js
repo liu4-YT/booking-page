@@ -6,8 +6,8 @@
 const CONFIG = {
     storeName: '书答水',                       // 店名
     slogan: '选择你想要的娱乐空间，提前锁定快乐', // 顶部副标题
-    // Formspree 表单端点（提交后数据自动发到你邮箱 + 后台可导出 Excel）
-    apiUrl: 'https://formspree.io/f/xjgnebaa'
+    // PythonAnywhere 后端 API（数据自动写入飞书多维表格）
+    apiUrl: 'https://liuyt.pythonanywhere.com/api/booking'
 };
 
 // 可预约项目列表（available: true 可约 / false 不可约并置灰）
