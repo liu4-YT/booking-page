@@ -1,7 +1,8 @@
 {
-    "functions": {
-        "api/booking.js": {
-            "runtime": "nodejs20.x"
+    "builds": [
+        {
+            "src": "api/booking.js",
+            "use": "@vercel/node"
         }
-    }
+    ]
 }
