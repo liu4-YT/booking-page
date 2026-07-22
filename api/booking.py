@@ -1,5 +1,7 @@
-from http.server import BaseHTTPRequestHandler
+from flask import Flask, request, jsonify
 import json, time, urllib.request
+
+app = Flask(__name__)
 
 FEISHU_APP_ID = 'cli_aaeacecbf47a9bc0'
 FEISHU_APP_SECRET = 'UmiNOo8IHbFIb1iLwEaa8gNreIem2nVD'
@@ -30,7 +32,7 @@ def get_token():
 
 def write_feishu(data):
     token = get_token()
-    body = json.dumps({
+    body = {
         'fields': {
             '称呼': (data.get('name') or '').strip(),
             '电话': (data.get('phone') or '').strip(),
@@ -40,9 +42,9 @@ def write_feishu(data):
             '人数': _to_int(data.get('people')),
             '备注': (data.get('remark') or '').strip()
         }
-    }).encode('utf-8')
+    }
     url = f'https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{TABLE_ID}/records'
-    req = urllib.request.Request(url, data=body, headers={
+    req = urllib.request.Request(url, data=json.dumps(body).encode('utf-8'), headers={
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json; charset=utf-8'
     })
@@ -57,50 +59,29 @@ def _to_int(v):
         return 0
 
 
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self._set_cors_headers()
-        self.send_response(204)
-        self.end_headers()
+@app.after_request
+def add_cors(resp):
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS, GET'
+    return resp
 
-    def do_GET(self):
-        self._set_cors_headers()
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        body = json.dumps({'status': 'ok', 'msg': 'API is working'}).encode('utf-8')
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
 
-    def do_POST(self):
-        self._set_cors_headers()
-        length = int(self.headers.get('Content-Length', 0))
-        try:
-            data = json.loads(self.rfile.read(length).decode('utf-8'))
-        except Exception as e:
-            self._respond(400, {'code': -1, 'msg': f'数据格式错误: {e}'})
-            return
+@app.route('/api/booking', methods=['GET', 'POST', 'OPTIONS'])
+def booking():
+    if request.method == 'OPTIONS':
+        return ('', 204)
+    if request.method == 'GET':
+        return jsonify({'status': 'ok'})
 
-        phone = (data.get('phone') or '').strip()
-        room = (data.get('roomName') or '').strip()
-        if not phone or not room:
-            self._respond(400, {'code': -1, 'msg': '电话和项目不能为空'})
-            return
-        try:
-            write_feishu(data)
-            self._respond(200, {'code': 0, 'msg': '预约成功'})
-        except Exception as e:
-            self._respond(500, {'code': -1, 'msg': str(e)})
+    data = request.get_json(silent=True) or {}
+    phone = (data.get('phone') or '').strip()
+    room = (data.get('roomName') or '').strip()
+    if not phone or not room:
+        return jsonify({'code': -1, 'msg': '电话和项目不能为空'}), 400
 
-    def _respond(self, status, body):
-        data = json.dumps(body, ensure_ascii=False).encode('utf-8')
-        self.send_response(status)
-        self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Content-Length', str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def _set_cors_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS, GET')
+    try:
+        write_feishu(data)
+        return jsonify({'code': 0, 'msg': '预约成功'})
+    except Exception as e:
+        return jsonify({'code': -1, 'msg': str(e)}), 500
