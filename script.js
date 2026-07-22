@@ -177,25 +177,27 @@ document.getElementById('dateConfirm').addEventListener('click', () => {
 async function submitBooking(data) {
     showToast('正在提交预约…', 'info');
     try {
+        // 用 form-urlencoded 避免 CORS 预检
+        const params = new URLSearchParams();
+        params.append('name', data.name || '');
+        params.append('phone', data.phone || '');
+        params.append('roomName', data.roomName || '');
+        params.append('date', data.date || '');
+        params.append('time', data.time || '');
+        params.append('people', data.people || '');
+        params.append('remark', data.remark || '');
+
         const resp = await fetch(CONFIG.apiUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                称呼: data.name,
-                电话: data.phone,
-                项目: data.roomName,
-                日期: data.date,
-                时间: data.time,
-                人数: data.people,
-                备注: data.remark
-            })
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
         });
         const result = await resp.json();
-        if (result.ok) {
+        if (result.code === 0) {
             showToast('预约成功！我们会尽快联系你', 'success');
             closeModal();
         } else {
-            showToast(result.error || '提交失败，请重试', 'error');
+            showToast(result.msg || '提交失败，请重试', 'error');
         }
     } catch (err) {
         showToast('网络错误，请稍后重试', 'error');
