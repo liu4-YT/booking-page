@@ -1,0 +1,7 @@
+{
+    "functions": {
+        "api/booking.js": {
+            "runtime": "nodejs20.x"
+        }
+    }
+}
