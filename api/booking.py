@@ -1,88 +1,111 @@
-from flask import Flask, request, jsonify
-import requests
-import time
+import json, time, urllib.request, ssl
 
-app = Flask(__name__)
-
-# CORS 支持（允许预约页跨域 POST）
-@app.after_request
-def add_cors(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-    response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-    return response
-
-# 飞书配置
 FEISHU_APP_ID = 'cli_aaeacecbf47a9bc0'
 FEISHU_APP_SECRET = 'UmiNOo8IHbFIb1iLwEaa8gNreIem2nVD'
 BASE_ID = 'QXazbngDbamnwGsMjEbc58TGnDh'
 TABLE_ID = 'tblRD66BfFKmKQQl'
 
-# Token 缓存
 _token = None
 _token_expire = 0
+
 
 def get_token():
     global _token, _token_expire
     now = time.time()
     if _token and now < _token_expire - 60:
         return _token
-    r = requests.post(
+    data = json.dumps({'app_id': FEISHU_APP_ID, 'app_secret': FEISHU_APP_SECRET}).encode()
+    req = urllib.request.Request(
         'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
-        json={'app_id': FEISHU_APP_ID, 'app_secret': FEISHU_APP_SECRET},
-        timeout=10
+        data=data,
+        headers={'Content-Type': 'application/json; charset=utf-8'}
     )
-    data = r.json()
-    _token = data['tenant_access_token']
-    _token_expire = now + data.get('expire', 7200)
+    resp = urllib.request.urlopen(req, timeout=10)
+    body = json.loads(resp.read())
+    _token = body['tenant_access_token']
+    _token_expire = now + body.get('expire', 7200)
     return _token
 
-@app.route('/api/booking', methods=['POST'])
-def booking():
-    try:
-        data = request.get_json(force=True)
-    except Exception:
-        return jsonify({'code': -1, 'msg': '数据格式错误'}), 400
 
-    # 提取字段
-    name = (data.get('name') or '').strip()
-    phone = (data.get('phone') or '').strip()
-    room = (data.get('roomName') or '').strip()
-    date = (data.get('date') or '').strip()
-    time_val = (data.get('time') or '').strip()
-    people = data.get('people', '')
-    remark = (data.get('remark') or '').strip()
-
-    if not phone or not room:
-        return jsonify({'code': -1, 'msg': '电话和项目不能为空'}), 400
-
-    try:
-        token = get_token()
-        headers = {
+def write_feishu(data):
+    token = get_token()
+    body = {
+        'fields': {
+            '称呼': (data.get('name') or '').strip(),
+            '电话': (data.get('phone') or '').strip(),
+            '项目': (data.get('roomName') or '').strip(),
+            '日期': (data.get('date') or '').strip(),
+            '时间': (data.get('time') or '').strip(),
+            '人数': _to_int(data.get('people')),
+            '备注': (data.get('remark') or '').strip()
+        }
+    }
+    url = f'https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{TABLE_ID}/records'
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode('utf-8'),
+        headers={
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json; charset=utf-8'
         }
-        body = {
-            'fields': {
-                '称呼': name,
-                '电话': phone,
-                '项目': room,
-                '日期': date,
-                '时间': time_val,
-                '人数': int(people) if people else 0,
-                '备注': remark
-            }
-        }
-        url = f'https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{TABLE_ID}/records'
-        r = requests.post(url, headers=headers, json=body, timeout=10)
-        resp = r.json()
-        if resp.get('code') != 0:
-            return jsonify({'code': -1, 'msg': f'飞书写入失败: {resp.get("msg")}'}), 500
+    )
+    resp = urllib.request.urlopen(req, timeout=10)
+    return json.loads(resp.read())
 
-        return jsonify({'code': 0, 'msg': '预约成功'})
-    except Exception as e:
-        return jsonify({'code': -1, 'msg': f'服务器错误: {str(e)}'}), 500
 
-# Vercel 入口
-def handler(environ, start_response):
-    return app(environ, start_response)
+def _to_int(v):
+    try:
+        return int(v)
+    except (ValueError, TypeError):
+        return 0
+
+
+class Handler:
+    """Vercel Python Serverless 入口"""
+
+    def __init__(self):
+        pass
+
+    def __call__(self, request, response):
+        return self.handler(request, response)
+
+    def handler(self, request, response):
+        # CORS
+        response.headers.update({
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Allow-Methods': 'POST, OPTIONS'
+        })
+
+        if request.method == 'OPTIONS':
+            response.status = 204
+            response.body = ''
+            return response
+
+        try:
+            body = json.loads(request.body.decode('utf-8'))
+        except Exception:
+            response.status = 400
+            response.body = json.dumps({'code': -1, 'msg': '数据格式错误'})
+            return response
+
+        phone = (body.get('phone') or '').strip()
+        room = (body.get('roomName') or '').strip()
+        if not phone or not room:
+            response.status = 400
+            response.body = json.dumps({'code': -1, 'msg': '电话和项目不能为空'})
+            return response
+
+        try:
+            write_feishu(body)
+            response.status = 200
+            response.body = json.dumps({'code': 0, 'msg': '预约成功'}, ensure_ascii=False)
+        except Exception as e:
+            response.status = 500
+            response.body = json.dumps({'code': -1, 'msg': str(e)}, ensure_ascii=False)
+
+        return response
+
+
+# Vercel 自动查找并注册 handler
+handler = Handler()
