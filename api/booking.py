@@ -1,4 +1,5 @@
-import json, time, urllib.request, ssl
+from http.server import BaseHTTPRequestHandler
+import json, time, urllib.request, ssl, io
 
 FEISHU_APP_ID = 'cli_aaeacecbf47a9bc0'
 FEISHU_APP_SECRET = 'UmiNOo8IHbFIb1iLwEaa8gNreIem2nVD'
@@ -29,7 +30,7 @@ def get_token():
 
 def write_feishu(data):
     token = get_token()
-    body = {
+    body = json.dumps({
         'fields': {
             '称呼': (data.get('name') or '').strip(),
             '电话': (data.get('phone') or '').strip(),
@@ -39,16 +40,12 @@ def write_feishu(data):
             '人数': _to_int(data.get('people')),
             '备注': (data.get('remark') or '').strip()
         }
-    }
+    }).encode('utf-8')
     url = f'https://open.feishu.cn/open-apis/bitable/v1/apps/{BASE_ID}/tables/{TABLE_ID}/records'
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(body).encode('utf-8'),
-        headers={
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json; charset=utf-8'
-        }
-    )
+    req = urllib.request.Request(url, data=body, headers={
+        'Authorization': f'Bearer {token}',
+        'Content-Type': 'application/json; charset=utf-8'
+    })
     resp = urllib.request.urlopen(req, timeout=10)
     return json.loads(resp.read())
 
@@ -60,52 +57,46 @@ def _to_int(v):
         return 0
 
 
-class Handler:
-    """Vercel Python Serverless 入口"""
+class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.end_headers()
 
-    def __init__(self):
-        pass
-
-    def __call__(self, request, response):
-        return self.handler(request, response)
-
-    def handler(self, request, response):
-        # CORS
-        response.headers.update({
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Access-Control-Allow-Methods': 'POST, OPTIONS'
-        })
-
-        if request.method == 'OPTIONS':
-            response.status = 204
-            response.body = ''
-            return response
+    def do_POST(self):
+        length = int(self.headers.get('Content-Length', 0))
+        body_str = self.rfile.read(length).decode('utf-8')
 
         try:
-            body = json.loads(request.body.decode('utf-8'))
+            data = json.loads(body_str)
         except Exception:
-            response.status = 400
-            response.body = json.dumps({'code': -1, 'msg': '数据格式错误'})
-            return response
+            self._respond(400, {'code': -1, 'msg': '数据格式错误'})
+            return
 
-        phone = (body.get('phone') or '').strip()
-        room = (body.get('roomName') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        room = (data.get('roomName') or '').strip()
         if not phone or not room:
-            response.status = 400
-            response.body = json.dumps({'code': -1, 'msg': '电话和项目不能为空'})
-            return response
+            self._respond(400, {'code': -1, 'msg': '电话和项目不能为空'})
+            return
 
         try:
-            write_feishu(body)
-            response.status = 200
-            response.body = json.dumps({'code': 0, 'msg': '预约成功'}, ensure_ascii=False)
+            write_feishu(data)
+            self._respond(200, {'code': 0, 'msg': '预约成功'})
         except Exception as e:
-            response.status = 500
-            response.body = json.dumps({'code': -1, 'msg': str(e)}, ensure_ascii=False)
+            self._respond(500, {'code': -1, 'msg': str(e)})
 
-        return response
+    def do_GET(self):
+        self._respond(200, {'status': 'ok'})
 
-
-# Vercel 自动查找并注册 handler
-handler = Handler()
+    def _respond(self, status, data):
+        body = json.dumps(data, ensure_ascii=False).encode('utf-8')
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS, GET')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
