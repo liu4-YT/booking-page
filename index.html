@@ -33,27 +33,19 @@
             <div class="modal__body">
                 <form class="booking-form" id="bookingForm">
                     <div class="form-row">
-                        <label class="form-label" for="name">称呼</label>
-                        <input class="form-input" type="text" id="name" name="name" placeholder="请输入你的称呼" required>
-                    </div>
-                    <div class="form-row">
-                        <label class="form-label" for="phone">联系电话</label>
-                        <input class="form-input" type="tel" id="phone" name="phone" placeholder="请输入手机号码" required maxlength="11">
+                        <label class="form-label" for="code">手环编号</label>
+                        <input class="form-input" type="text" id="code" name="code" placeholder="请输入4位编号" required maxlength="4" pattern="[0-9]{4}" inputmode="numeric">
                     </div>
                     <div class="form-row">
                         <label class="form-label" for="date">预约日期</label>
                         <input class="form-input" type="text" id="date" name="date" placeholder="请选择日期" readonly required>
                     </div>
                     <div class="form-row">
-                        <label class="form-label" for="time">到店时间</label>
-                        <select class="form-input" id="time" name="time" required>
-                            <option value="">请选择时间段</option>
-                            <!-- 时段由 script.js 按表格动态生成 -->
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <label class="form-label" for="people">人数</label>
-                        <input class="form-input" type="number" id="people" name="people" min="1" placeholder="请输入人数" required>
+                        <label class="form-label">选择时段</label>
+                        <div class="time-slots" id="timeSlots">
+                            <!-- 时段按钮由 script.js 动态生成 -->
+                        </div>
+                        <input type="hidden" id="time" name="time">
                     </div>
                     <div class="form-row">
                         <label class="form-label" for="remark">备注</label>

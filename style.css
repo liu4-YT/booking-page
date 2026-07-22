@@ -311,6 +311,43 @@ body {
     resize: none;
 }
 
+/* ========== 时段选择按钮组 ========== */
+.time-slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.time-slot {
+    flex: 0 0 calc(33.33% - 6px);
+    padding: 10px 0;
+    text-align: center;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--text-main);
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.time-slot:active {
+    transform: scale(0.96);
+}
+.time-slot--active {
+    border-color: var(--primary);
+    background: #FFF3ED;
+    color: var(--primary);
+    font-weight: 600;
+}
+.time-slot--disabled {
+    border-color: var(--disabled-bg);
+    background: var(--disabled-bg);
+    color: var(--disabled-text);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .submit-btn {
     width: 100%;
     height: 48px;

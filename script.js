@@ -6,8 +6,9 @@
 const CONFIG = {
     storeName: '书答水',                       // 店名
     slogan: '选择你想要的娱乐空间，提前锁定快乐', // 顶部副标题
-    // PythonAnywhere 后端 API（数据自动写入飞书多维表格）
-    apiUrl: 'https://liuyt.pythonanywhere.com/api/booking'
+    // PythonAnywhere 后端
+    apiUrl: 'https://liuyt.pythonanywhere.com/api/booking',
+    queryUrl: 'https://liuyt.pythonanywhere.com/api/occupied'
 };
 
 // 可预约项目列表（available: true 可约 / false 不可约并置灰）
@@ -59,14 +60,15 @@ const SLOT_LAST_END = '22:20'; // 最后一个时段终点
 function timeToMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
 function minToTime(min) { const h = Math.floor(min / 60), m = min % 60; return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
 
-// 按项目时段长度生成可选时间段
-function buildSlots(durationMin) {
+// 按项目时段长度生成可选时间段（occupied 是已被占的时段列表）
+function buildSlots(durationMin, occupied) {
     const start = timeToMin(SLOT_START);
     const end = timeToMin(SLOT_LAST_END);
+    const occupiedSet = new Set(occupied || []);
     const out = [];
     for (let t = start; t + durationMin <= end + 0.001; t += 20) {
         const label = minToTime(t) + '—' + minToTime(t + durationMin);
-        out.push({ value: label, label });
+        out.push({ value: label, label, disabled: occupiedSet.has(label) });
     }
     return out;
 }
@@ -188,58 +190,57 @@ document.getElementById('dateConfirm').addEventListener('click', () => {
     dateSheet.classList.remove('show');
 });
 
-// 提交预约到 Formspree
-// 提交预约到 PythonAnywhere（通过表单提交，兼容微信）
-async function submitBooking(data) {
-    showToast('正在提交预约…', 'info');
-
-    // 动态创建表单，绕过微信跨域限制
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = CONFIG.apiUrl;
-    form.style.display = 'none';
-
-    // 成功后跳回当前页
-    const returnUrl = window.location.href.split('?')[0] + '?success=1';
-    const fields = {
-        name: data.name || '',
-        phone: data.phone || '',
-        roomName: data.roomName || '',
-        date: data.date || '',
-        time: data.time || '',
-        people: data.people || '',
-        remark: data.remark || '',
-        returnUrl: returnUrl
-    };
-
-    for (const [k, v] of Object.entries(fields)) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = k;
-        input.value = v;
-        form.appendChild(input);
-    }
-
-    document.body.appendChild(form);
-    form.submit();
+// ========== 查询已占用时段 ==========
+async function fetchOccupied(roomName, date) {
+    try {
+        const resp = await fetch(CONFIG.queryUrl + '?room=' + encodeURIComponent(roomName) + '&date=' + encodeURIComponent(date));
+        const data = await resp.json();
+        return data.occupied || [];
+    } catch (e) { return []; }
 }
 
-// 弹窗：选日期 + 时段
-function populateTime(room) {
-    const sel = bookingForm.time;
-    sel.innerHTML = '<option value="">请选择时间段</option>';
-    buildSlots(room.slotMin || 20).forEach(s => {
-        const o = document.createElement('option');
-        o.value = s.value;
-        o.textContent = s.label;
-        sel.appendChild(o);
+// ========== 时段按钮渲染 ==========
+let currentRoom = null;
+
+function populateSlots(slots) {
+    const container = document.getElementById('timeSlots');
+    document.getElementById('time').value = '';
+    container.innerHTML = '';
+    slots.forEach(s => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'time-slot' + (s.disabled ? ' time-slot--disabled' : '');
+        btn.textContent = s.label;
+        btn.disabled = s.disabled;
+        if (!s.disabled) {
+            btn.addEventListener('click', () => {
+                container.querySelectorAll('.time-slot--active').forEach(b => b.classList.remove('time-slot--active'));
+                btn.classList.add('time-slot--active');
+                document.getElementById('time').value = s.value;
+            });
+        }
+        container.appendChild(btn);
     });
 }
 
-function openModal(room) {
-    modalTitle.textContent = `预约 ${room.name}`;
+async function openModal(room) {
+    currentRoom = room;
+    modalTitle.textContent = '预约 ' + room.name;
     bookingForm.dataset.roomId = room.id;
-    populateTime(room);
+    bookingForm.reset();
+    document.getElementById('date').value = '';
+
+    const today = new Date();
+    const y = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = y + '-' + mm + '-' + dd;
+    document.getElementById('date').value = todayStr;
+    selectedDate = todayStr;
+
+    document.getElementById('timeSlots').innerHTML = '<span style=\"color:#999;font-size:13px\">加载中…</span>';
+    const occupied = await fetchOccupied(room.name, todayStr);
+    populateSlots(buildSlots(room.slotMin || 20, occupied));
     modal.classList.add('show');
 }
 
@@ -247,65 +248,68 @@ function closeModal() {
     modal.classList.remove('show');
     bookingForm.reset();
     delete bookingForm.dataset.roomId;
+    currentRoom = null;
+    document.getElementById('timeSlots').innerHTML = '';
 }
 
 modalClose.addEventListener('click', closeModal);
 modal.querySelector('.modal__overlay').addEventListener('click', closeModal);
 
-// 点击可预约项目 → 打开弹窗
-roomList.addEventListener('click', (e) => {
-    const card = e.target.closest('.room-card');
-    if (!card) return;
-
-    const room = rooms.find(item => item.id === card.dataset.id);
-    if (!room) return;
-    if (!room.available) {
-        showToast('该项目暂不开放预约', 'error');
-        return;
+// 日期确定后刷新时段
+document.getElementById('dateConfirm').addEventListener('click', async () => {
+    if (!selectedDate) { showToast('请先选择日期', 'error'); return; }
+    document.getElementById('date').value = selectedDate;
+    dateSheet.classList.remove('show');
+    if (currentRoom) {
+        document.getElementById('timeSlots').innerHTML = '<span style=\"color:#999;font-size:13px\">加载中…</span>';
+        document.getElementById('time').value = '';
+        const occupied = await fetchOccupied(currentRoom.name, selectedDate);
+        populateSlots(buildSlots(currentRoom.slotMin || 20, occupied));
     }
-    openModal(room);
 });
 
-// 表单提交 → 预填并跳转收集表
+// 点击房间卡 → 弹窗
+roomList.addEventListener('click', async (e) => {
+    const card = e.target.closest('.room-card');
+    if (!card) return;
+    const room = rooms.find(item => item.id === card.dataset.id);
+    if (!room) return;
+    if (!room.available) { showToast('该项目暂不开放预约', 'error'); return; }
+    await openModal(room);
+});
+
+// ========== 表单提交 ==========
+function submitBooking(data) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = CONFIG.apiUrl;
+    form.style.display = 'none';
+    const fields = { code: data.code || '', roomName: data.roomName || '', date: data.date || '', time: data.time || '', remark: data.remark || '' };
+    for (const [k, v] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = k; input.value = v;
+        form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+}
+
 bookingForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    const code = (document.getElementById('code').value || '').trim();
+    const date = document.getElementById('date').value;
+    const time = document.getElementById('time').value;
 
-    const fd = new FormData(bookingForm);
-    const date = (fd.get('date') || '').toString().trim();
-    const time = (fd.get('time') || '').toString().trim();
+    if (!/^\d{4}$/.test(code)) { showToast('请输入4位数字手环编号', 'error'); return; }
     if (!date) { showToast('请选择预约日期', 'error'); return; }
-    if (!time) { showToast('请选择到店时间', 'error'); return; }
-
-    const phone = (fd.get('phone') || '').toString().trim();
-    if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
-        bookingForm.phone.style.borderColor = '#FF4D4F';
-        showToast('请输入有效的手机号码', 'error');
-        return;
-    }
-    bookingForm.phone.style.borderColor = '';
+    if (!time) { showToast('请选择时段', 'error'); return; }
 
     const room = rooms.find(r => r.id === bookingForm.dataset.roomId);
-    const data = {
-        name: (fd.get('name') || '').toString().trim(),
-        phone: phone,
+    submitBooking({
+        code: code,
         roomName: room ? room.name : '',
         date: date,
         time: time,
-        people: (fd.get('people') || '').toString().trim(),
-        remark: (fd.get('remark') || '').toString().trim()
-    };
-
-    submitBooking(data);
-});
-
-// 手机号校验
-const phoneInput = document.getElementById('phone');
-phoneInput.addEventListener('blur', () => {
-    const phone = phoneInput.value.trim();
-    if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
-        phoneInput.style.borderColor = '#FF4D4F';
-        showToast('请输入有效的手机号码', 'error');
-    } else {
-        phoneInput.style.borderColor = '';
-    }
+        remark: (document.getElementById('remark').value || '').trim()
+    });
 });
