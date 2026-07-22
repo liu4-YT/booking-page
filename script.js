@@ -6,9 +6,8 @@
 const CONFIG = {
     storeName: '书答水',                       // 店名
     slogan: '选择你想要的娱乐空间，提前锁定快乐', // 顶部副标题
-    // 飞书多维表格 API 地址（Vercel 部署后更新为实际地址）
-    // 部署后把下面地址换成 https://你的项目名.vercel.app/api/booking
-    apiUrl: 'https://YOUR_APP.vercel.app/api/booking'
+    // Formspree 表单端点（提交后数据自动发到你邮箱 + 后台可导出 Excel）
+    apiUrl: 'https://formspree.io/f/xjgnebaa'
 };
 
 // 可预约项目列表（available: true 可约 / false 不可约并置灰）
@@ -174,21 +173,29 @@ document.getElementById('dateConfirm').addEventListener('click', () => {
     dateSheet.classList.remove('show');
 });
 
-// 提交预约到飞书多维表格
+// 提交预约到 Formspree
 async function submitBooking(data) {
     showToast('正在提交预约…', 'info');
     try {
         const resp = await fetch(CONFIG.apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify({
+                称呼: data.name,
+                电话: data.phone,
+                项目: data.roomName,
+                日期: data.date,
+                时间: data.time,
+                人数: data.people,
+                备注: data.remark
+            })
         });
         const result = await resp.json();
-        if (result.code === 0) {
-            showToast('预约成功！', 'success');
+        if (result.ok) {
+            showToast('预约成功！我们会尽快联系你', 'success');
             closeModal();
         } else {
-            showToast(result.msg || '提交失败，请重试', 'error');
+            showToast(result.error || '提交失败，请重试', 'error');
         }
     } catch (err) {
         showToast('网络错误，请稍后重试', 'error');
