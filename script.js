@@ -112,6 +112,21 @@ function renderRooms() {
 
 renderRooms();
 
+// 表单提交后重定向回来的提示
+(function checkRedirect() {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('success') === '1') {
+        history.replaceState({}, '', window.location.pathname);
+        showToast('预约成功！我们会尽快联系你', 'success');
+    } else if (p.get('error') === '1') {
+        history.replaceState({}, '', window.location.pathname);
+        showToast('提交失败，请重试', 'error');
+    } else if (p.get('error') === 'missing') {
+        history.replaceState({}, '', window.location.pathname);
+        showToast('请填写电话和项目', 'error');
+    }
+})();
+
 // 弹窗逻辑
 const modal = document.getElementById('bookingModal');
 const modalTitle = document.getElementById('modalTitle');
@@ -174,34 +189,39 @@ document.getElementById('dateConfirm').addEventListener('click', () => {
 });
 
 // 提交预约到 Formspree
+// 提交预约到 PythonAnywhere（通过表单提交，兼容微信）
 async function submitBooking(data) {
     showToast('正在提交预约…', 'info');
-    try {
-        // 用 form-urlencoded 避免 CORS 预检
-        const params = new URLSearchParams();
-        params.append('name', data.name || '');
-        params.append('phone', data.phone || '');
-        params.append('roomName', data.roomName || '');
-        params.append('date', data.date || '');
-        params.append('time', data.time || '');
-        params.append('people', data.people || '');
-        params.append('remark', data.remark || '');
 
-        const resp = await fetch(CONFIG.apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
-        });
-        const result = await resp.json();
-        if (result.code === 0) {
-            showToast('预约成功！我们会尽快联系你', 'success');
-            closeModal();
-        } else {
-            showToast(result.msg || '提交失败，请重试', 'error');
-        }
-    } catch (err) {
-        showToast('网络错误，请稍后重试', 'error');
+    // 动态创建表单，绕过微信跨域限制
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = CONFIG.apiUrl;
+    form.style.display = 'none';
+
+    // 成功后跳回当前页
+    const returnUrl = window.location.href.split('?')[0] + '?success=1';
+    const fields = {
+        name: data.name || '',
+        phone: data.phone || '',
+        roomName: data.roomName || '',
+        date: data.date || '',
+        time: data.time || '',
+        people: data.people || '',
+        remark: data.remark || '',
+        returnUrl: returnUrl
+    };
+
+    for (const [k, v] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = k;
+        input.value = v;
+        form.appendChild(input);
     }
+
+    document.body.appendChild(form);
+    form.submit();
 }
 
 // 弹窗：选日期 + 时段
