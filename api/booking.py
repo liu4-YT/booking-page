@@ -1,3 +1,4 @@
+print('=== API LOADED ===')
 from flask import Flask, request, jsonify
 import time, urllib.request, json
 
