@@ -6,9 +6,9 @@
 const CONFIG = {
     storeName: '书答水',                       // 店名
     slogan: '选择你想要的娱乐空间，提前锁定快乐', // 顶部副标题
-    // 腾讯文档收集表地址（预约数据直接落进腾讯文档表格，可导出/分享）
-    // 在腾讯文档里打开该表，添加题目后可换链接；当前链接已设为「所有人可查看」
-    collectFormUrl: 'https://docs.qq.com/form/page/DSFdzWUVkd1pycmpW'
+    // 飞书多维表格 API 地址（Vercel 部署后更新为实际地址）
+    // 部署后把下面地址换成 https://你的项目名.vercel.app/api/booking
+    apiUrl: 'https://YOUR_APP.vercel.app/api/booking'
 };
 
 // 可预约项目列表（available: true 可约 / false 不可约并置灰）
@@ -174,27 +174,25 @@ document.getElementById('dateConfirm').addEventListener('click', () => {
     dateSheet.classList.remove('show');
 });
 
-// 打开腾讯文档收集表（带预填，数据落进腾讯文档表格）
-// 收集表题目需按此顺序创建：1称呼 2电话 3项目 4日期 5时间 6人数 7备注
-function openCollectForm(data) {
-    let url = CONFIG.collectFormUrl;
-    const map = {
-        field_1: data.name,
-        field_2: data.phone,
-        field_3: data.roomName,
-        field_4: data.date,
-        field_5: data.time,
-        field_6: data.people,
-        field_7: data.remark
-    };
-    const q = [];
-    for (const k in map) {
-        if (map[k]) q.push(k + '=' + encodeURIComponent(map[k]));
+// 提交预约到飞书多维表格
+async function submitBooking(data) {
+    showToast('正在提交预约…', 'info');
+    try {
+        const resp = await fetch(CONFIG.apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await resp.json();
+        if (result.code === 0) {
+            showToast('预约成功！', 'success');
+            closeModal();
+        } else {
+            showToast(result.msg || '提交失败，请重试', 'error');
+        }
+    } catch (err) {
+        showToast('网络错误，请稍后重试', 'error');
     }
-    if (q.length) url += (url.indexOf('?') === -1 ? '?' : '&') + q.join('&');
-    showToast('正在打开预约表…', 'info');
-    // 微信内置浏览器用 location 跳转更稳妥
-    window.location.href = url;
 }
 
 // 弹窗：选日期 + 时段
@@ -268,7 +266,7 @@ bookingForm.addEventListener('submit', (e) => {
         remark: (fd.get('remark') || '').toString().trim()
     };
 
-    openCollectForm(data);
+    submitBooking(data);
 });
 
 // 手机号校验
