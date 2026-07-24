@@ -18,7 +18,7 @@ const rooms = [
         name: 'KTV 小包',
         icon: '🎤',
         desc: '私密小包间，适合 2-6 人欢唱。',
-        price: '按位计费',
+        price: '按位计时',
         unit: '每人 20 分钟',
         slotMin: 20,            // 每个时段 20 分钟
         available: true
@@ -46,7 +46,7 @@ const rooms = [
         name: '棋牌弈境',
         icon: '♟️',
         desc: '麻将、德州、棋类等休闲对弈空间。',
-        price: '按位计费',
+        price: '按位计时',
         unit: '每人 40 分钟',
         slotMin: 40,            // 每个时段 40 分钟
         available: true
