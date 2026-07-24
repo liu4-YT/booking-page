@@ -61,14 +61,15 @@ function timeToMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 +
 function minToTime(min) { const h = Math.floor(min / 60), m = min % 60; return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
 
 // 按项目时段长度生成可选时间段（occupied 是已被占的时段列表）
+function norm(s) { return (s || '').replace(/[—–-]/g, '-').replace(/\s+/g, ''); }
 function buildSlots(durationMin, occupied) {
     const start = timeToMin(SLOT_START);
     const end = timeToMin(SLOT_LAST_END);
-    const occupiedSet = new Set(occupied || []);
+    const occupiedSet = new Set((occupied || []).map(norm));
     const out = [];
     for (let t = start; t + durationMin <= end + 0.001; t += 20) {
         const label = minToTime(t) + '—' + minToTime(t + durationMin);
-        out.push({ value: label, label, disabled: occupiedSet.has(label) });
+        out.push({ value: label, label, disabled: occupiedSet.has(norm(label)) });
     }
     return out;
 }
