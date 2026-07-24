@@ -193,7 +193,10 @@ document.getElementById('dateConfirm').addEventListener('click', () => {
 // ========== 查询已占用时段 ==========
 async function fetchOccupied(roomName, date) {
     try {
-        const resp = await fetch(CONFIG.queryUrl + '?room=' + encodeURIComponent(roomName) + '&date=' + encodeURIComponent(date));
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 4000);
+        const resp = await fetch(CONFIG.queryUrl + '?room=' + encodeURIComponent(roomName) + '&date=' + encodeURIComponent(date), { signal: controller.signal });
+        clearTimeout(timer);
         const data = await resp.json();
         return data.occupied || [];
     } catch (e) { return []; }
