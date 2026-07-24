@@ -223,12 +223,11 @@ function populateSlots(slots) {
     });
 }
 
-async function openModal(room) {
+function openModal(room) {
     currentRoom = room;
     modalTitle.textContent = '预约 ' + room.name;
     bookingForm.dataset.roomId = room.id;
     bookingForm.reset();
-    document.getElementById('date').value = '';
 
     const today = new Date();
     const y = today.getFullYear();
@@ -238,10 +237,16 @@ async function openModal(room) {
     document.getElementById('date').value = todayStr;
     selectedDate = todayStr;
 
-    document.getElementById('timeSlots').innerHTML = '<span style=\"color:#999;font-size:13px\">加载中…</span>';
-    const occupied = await fetchOccupied(room.name, todayStr);
-    populateSlots(buildSlots(room.slotMin || 20, occupied));
+    // 先显示弹窗，再异步加载时段
     modal.classList.add('show');
+    document.getElementById('timeSlots').innerHTML = '<span style=\"color:#999;font-size:13px\">加载时段…</span>';
+
+    loadSlots(room, todayStr);
+}
+
+async function loadSlots(room, dateStr) {
+    const occupied = await fetchOccupied(room.name, dateStr);
+    populateSlots(buildSlots(room.slotMin || 20, occupied));
 }
 
 function closeModal() {
@@ -261,10 +266,9 @@ document.getElementById('dateConfirm').addEventListener('click', async () => {
     document.getElementById('date').value = selectedDate;
     dateSheet.classList.remove('show');
     if (currentRoom) {
-        document.getElementById('timeSlots').innerHTML = '<span style=\"color:#999;font-size:13px\">加载中…</span>';
+        document.getElementById('timeSlots').innerHTML = '<span style=\"color:#999;font-size:13px\">加载时段…</span>';
         document.getElementById('time').value = '';
-        const occupied = await fetchOccupied(currentRoom.name, selectedDate);
-        populateSlots(buildSlots(currentRoom.slotMin || 20, occupied));
+        await loadSlots(currentRoom, selectedDate);
     }
 });
 
