@@ -53,9 +53,9 @@ const rooms = [
     }
 ];
 
-// 营业时段（来自预约表）：11:00 - 22:20，每 20 分钟一档
-const SLOT_START = '11:00';   // 第一个时段起点
-const SLOT_LAST_END = '22:20'; // 最后一个时段终点
+// 营业时段：10:00 - 24:00，每 20 分钟一档
+const SLOT_START = '10:00';   // 第一个时段起点
+const SLOT_LAST_END = '24:00'; // 最后一个时段终点
 
 function timeToMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
 function minToTime(min) { const h = Math.floor(min / 60), m = min % 60; return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
