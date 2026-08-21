@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>正在登录...</title>
+<style>
+body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#6a5cff;color:#fff;margin:0}
+.spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.box{text-align:center}
+</style>
+</head>
+<body>
+<div class="box">
+    <div class="spinner"></div>
+    <p>正在登录，请稍候...</p>
+</div>
+<script>
+const API = 'https://liuyt.pythonanywhere.com';
+
+(async function(){
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+
+    if(!code){
+        // 没有 code，可能是用户取消授权，跳回签到页
+        window.location.href = '/signin.html';
+        return;
+    }
+
+    try{
+        const resp = await fetch(API + '/api/wx/code2session?code=' + encodeURIComponent(code));
+        const data = await resp.json();
+        if(data.ok && data.openid){
+            localStorage.setItem('openid', data.openid);
+            window.location.href = '/signin.html';
+        }else{
+            document.body.innerHTML = '<div class="box"><p>登录失败，请重试</p><p style="font-size:14px;opacity:.8">' + (data.msg||'') + '</p></div>';
+        }
+    }catch(e){
+        document.body.innerHTML = '<div class="box"><p>网络错误，请重试</p></div>';
+    }
+})();
+</script>
+</body>
+</html>

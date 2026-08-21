@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>签到领门票</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+    background:linear-gradient(160deg,#6a5cff 0%,#8b5cf6 45%,#ec4899 100%);
+    min-height:100vh;
+    color:#fff;
+    -webkit-tap-highlight-color:transparent;
+}
+.container{max-width:480px;margin:0 auto;padding:24px 20px 40px}
+
+/* 顶部 */
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.logo{font-size:15px;font-weight:600;opacity:.9}
+.back{font-size:14px;opacity:.85;text-decoration:none;color:#fff}
+
+/* 签到卡片 */
+.card{
+    background:rgba(255,255,255,.14);
+    backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.25);
+    border-radius:24px;
+    padding:32px 24px;
+    text-align:center;
+    margin-bottom:20px;
+}
+.streak-num{font-size:72px;font-weight:800;line-height:1;letter-spacing:-2px}
+.streak-label{font-size:15px;opacity:.85;margin-top:8px}
+
+/* 签到按钮 */
+.sign-btn{
+    display:block;width:100%;
+    padding:16px 0;
+    background:#fff;
+    color:#7c3aed;
+    border:none;border-radius:16px;
+    font-size:18px;font-weight:700;
+    cursor:pointer;
+    transition:transform .1s;
+}
+.sign-btn:active{transform:scale(.97)}
+.sign-btn:disabled{background:rgba(255,255,255,.4);color:rgba(255,255,255,.9);cursor:not-allowed}
+
+/* 7天进度 */
+.progress-box{display:flex;justify-content:space-between;margin:24px 0 8px}
+.day-dot{
+    width:34px;height:34px;border-radius:50%;
+    background:rgba(255,255,255,.2);
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:600;
+    border:1.5px solid rgba(255,255,255,.3);
+}
+.day-dot.on{background:#fff;color:#7c3aed;border-color:#fff}
+.progress-hint{font-size:12px;opacity:.75;text-align:center}
+
+/* 门票卡片 */
+.ticket{
+    background:#fff;color:#333;border-radius:20px;
+    padding:20px;margin-bottom:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,.15);
+    position:relative;overflow:hidden;
+}
+.ticket::before,.ticket::after{
+    content:'';position:absolute;width:20px;height:20px;
+    background:#6a5cff;border-radius:50%;top:50%;transform:translateY(-50%);
+}
+.ticket::before{left:-10px}
+.ticket::after{right:-10px}
+.ticket--used{opacity:.55;filter:grayscale(.6)}
+.ticket__type{font-size:17px;font-weight:700;color:#7c3aed}
+.ticket__code{font-size:26px;font-weight:800;letter-spacing:4px;margin:10px 0;font-variant-numeric:tabular-nums}
+.ticket__meta{font-size:12px;color:#999}
+.ticket__badge{
+    position:absolute;top:12px;right:12px;
+    padding:3px 10px;border-radius:12px;font-size:11px;
+    background:#f0fdf4;color:#16a34a;
+}
+.ticket__badge--used{background:#f3f4f6;color:#9ca3af}
+
+.empty-ticket{text-align:center;padding:30px 0;opacity:.8;font-size:14px}
+
+/* Toast */
+.toast{
+    position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);
+    background:rgba(0,0,0,.8);color:#fff;padding:14px 24px;
+    border-radius:12px;font-size:15px;z-index:999;
+    opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.toast--show{opacity:1}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <span class="logo">书答水 · 签到有礼</span>
+        <a class="back" href="/">返回首页</a>
+    </div>
+
+    <div class="card">
+        <div class="streak-num" id="streakNum">0</div>
+        <div class="streak-label">连续签到天数</div>
+
+        <div class="progress-box" id="progressBox"></div>
+        <div class="progress-hint">连续签到 <b id="needDays">7</b> 天，免费领「全天不限时畅玩门票」</div>
+
+        <button class="sign-btn" id="signBtn" style="margin-top:24px">立即签到</button>
+    </div>
+
+    <div class="ticket" style="background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;box-shadow:none;text-align:center">
+        <div style="font-size:16px;font-weight:700;margin-bottom:4px">🎫 我的门票</div>
+    </div>
+    <div id="ticketList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://liuyt.pythonanywhere.com';
+const WX_APPID = 'wxe2009590b5f09fae';
+const CALLBACK_URL = 'https://shudashui.com/oauth_callback.html';
+
+let openid = localStorage.getItem('openid') || '';
+
+function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('toast--show');
+    setTimeout(()=>t.classList.remove('toast--show'), 2200);
+}
+
+// 渲染进度点
+function renderProgress(streak){
+    const box = document.getElementById('progressBox');
+    const need = parseInt(document.getElementById('needDays').textContent);
+    box.innerHTML = '';
+    for(let i=1;i<=need;i++){
+        const d = document.createElement('div');
+        d.className = 'day-dot' + (i<=streak ? ' on' : '');
+        d.textContent = i;
+        box.appendChild(d);
+    }
+}
+
+// 渲染门票
+function renderTickets(tickets){
+    const list = document.getElementById('ticketList');
+    if(!tickets || tickets.length===0){
+        list.innerHTML = '<div class="empty-ticket">还没有门票，连续签到7天领取</div>';
+        return;
+    }
+    list.innerHTML = tickets.map(t=>{
+        const used = t.status === '已使用';
+        return `<div class="ticket ${used?'ticket--used':''}">
+            <span class="ticket__badge ${used?'ticket__badge--used':''}">${used?'已使用':'可使用'}</span>
+            <div class="ticket__type">${t.type}</div>
+            <div class="ticket__code">${t.code}</div>
+            <div class="ticket__meta">领取日期：${t.date}${t.verify_time ? ' · 核销：'+t.verify_time : ''}</div>
+        </div>`;
+    }).join('');
+}
+
+// 加载状态
+async function loadStatus(){
+    if(!openid) return;
+    try{
+        const resp = await fetch(API + '/api/signin/status?openid=' + encodeURIComponent(openid));
+        const data = await resp.json();
+        if(data.ok){
+            document.getElementById('streakNum').textContent = data.streak;
+            document.getElementById('needDays').textContent = data.need_days;
+            renderProgress(data.streak);
+            renderTickets(data.tickets);
+            document.getElementById('signBtn').disabled = data.today_signed;
+            document.getElementById('signBtn').textContent = data.today_signed ? '今日已签到' : '立即签到';
+        }
+    }catch(e){
+        toast('网络错误，请重试');
+    }
+}
+
+// 签到
+document.getElementById('signBtn').addEventListener('click', async ()=>{
+    if(!openid){ startOAuth(); return; }
+    const btn = document.getElementById('signBtn');
+    btn.disabled = true;
+    btn.textContent = '签到中...';
+    try{
+        const params = new URLSearchParams();
+        params.append('openid', openid);
+        const resp = await fetch(API + '/api/signin/do', {
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body: params.toString()
+        });
+        const data = await resp.json();
+        if(data.ok){
+            if(data.already){
+                toast('今日已签到');
+            }else{
+                toast('签到成功，已连续 ' + data.streak + ' 天');
+                if(data.ticket){
+                    setTimeout(()=>{
+                        toast('🎉 恭喜获得「'+data.ticket.type+'」！');
+                    }, 1200);
+                }
+            }
+            loadStatus();
+        }else{
+            toast(data.msg || '签到失败');
+        }
+    }catch(e){
+        toast('网络错误，请重试');
+    }finally{
+        loadStatus();
+    }
+});
+
+// 微信授权
+function startOAuth(){
+    const redirect = encodeURIComponent(CALLBACK_URL);
+    const url = 'https://open.weixin.qq.com/connect/oauth2/authorize?appid=' + WX_APPID +
+        '&redirect_uri=' + redirect +
+        '&response_type=code&scope=snsapi_base&state=' + Date.now() + '#wechat_redirect';
+    window.location.href = url;
+}
+
+// 初始化
+if(!openid){
+    document.getElementById('signBtn').textContent = '微信授权后签到';
+}else{
+    loadStatus();
+}
+</script>
+</body>
+</html>

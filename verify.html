@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>门票核销</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+    background:linear-gradient(160deg,#0f172a 0%,#1e293b 100%);
+    min-height:100vh;
+    color:#e2e8f0;
+    display:flex;justify-content:center;align-items:flex-start;
+    -webkit-tap-highlight-color:transparent;
+}
+.container{max-width:480px;width:100%;margin:0 auto;padding:40px 24px}
+.title{font-size:22px;font-weight:700;text-align:center;margin-bottom:8px}
+.subtitle{font-size:13px;text-align:center;opacity:.6;margin-bottom:32px}
+
+.code-input{
+    width:100%;padding:16px;text-align:center;
+    font-size:28px;font-weight:800;letter-spacing:8px;
+    border:2px solid #334155;border-radius:16px;
+    background:#1e293b;color:#fff;
+    font-variant-numeric:tabular-nums;
+}
+.code-input:focus{outline:none;border-color:#6366f1}
+.code-input::placeholder{letter-spacing:2px;font-size:16px;font-weight:400;color:#475569}
+
+.verify-btn{
+    display:block;width:100%;margin-top:20px;
+    padding:16px 0;background:#6366f1;color:#fff;
+    border:none;border-radius:16px;font-size:18px;font-weight:700;
+    cursor:pointer;transition:transform .1s;
+}
+.verify-btn:active{transform:scale(.97)}
+.verify-btn:disabled{opacity:.5}
+
+.result{
+    margin-top:24px;padding:20px;border-radius:16px;
+    text-align:center;font-size:15px;line-height:1.6;
+    display:none;
+}
+.result--ok{display:block;background:#052e16;color:#4ade80;border:1px solid #166534}
+.result--err{display:block;background:#450a0a;color:#f87171;border:1px solid #991b1b}
+
+.hint{text-align:center;font-size:12px;opacity:.45;margin-top:32px}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="title">门票核销</div>
+    <div class="subtitle">输入顾客的 8 位核销码</div>
+
+    <input class="code-input" id="codeInput" type="text" inputmode="numeric" maxlength="8" placeholder="请输入核销码" autocomplete="off">
+
+    <button class="verify-btn" id="verifyBtn">确认核销</button>
+
+    <div class="result" id="result"></div>
+
+    <div class="hint">核销后门票即刻作废，不可重复使用</div>
+</div>
+
+<script>
+const API = 'https://liuyt.pythonanywhere.com';
+
+document.getElementById('verifyBtn').addEventListener('click', async ()=>{
+    const code = document.getElementById('codeInput').value.trim();
+    const result = document.getElementById('result');
+    if(!code){
+        showResult('请输入核销码', false);
+        return;
+    }
+    if(!/^\d{8}$/.test(code)){
+        showResult('核销码为 8 位数字', false);
+        return;
+    }
+
+    const btn = document.getElementById('verifyBtn');
+    btn.disabled = true;
+    btn.textContent = '核销中...';
+
+    try{
+        const params = new URLSearchParams();
+        params.append('code', code);
+        const resp = await fetch(API + '/api/ticket/verify', {
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body: params.toString()
+        });
+        const data = await resp.json();
+        showResult(data.msg, data.ok);
+        if(data.ok){
+            document.getElementById('codeInput').value = '';
+        }
+    }catch(e){
+        showResult('网络错误，请重试', false);
+    }finally{
+        btn.disabled = false;
+        btn.textContent = '确认核销';
+    }
+});
+
+function showResult(msg, ok){
+    const result = document.getElementById('result');
+    result.textContent = msg;
+    result.className = 'result ' + (ok ? 'result--ok' : 'result--err');
+}
+
+// 回车触发核销
+document.getElementById('codeInput').addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter') document.getElementById('verifyBtn').click();
+});
+</script>
+</body>
+</html>
