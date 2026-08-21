@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>签到领门票</title>
+<title>我的签到</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{
@@ -15,12 +15,10 @@ body{
 }
 .container{max-width:480px;margin:0 auto;padding:24px 20px 40px}
 
-/* 顶部 */
 .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
 .logo{font-size:15px;font-weight:600;opacity:.9}
-.back{font-size:14px;opacity:.85;text-decoration:none;color:#fff}
+.hint{font-size:13px;opacity:.7}
 
-/* 签到卡片 */
 .card{
     background:rgba(255,255,255,.14);
     backdrop-filter:blur(20px);
@@ -33,21 +31,6 @@ body{
 .streak-num{font-size:72px;font-weight:800;line-height:1;letter-spacing:-2px}
 .streak-label{font-size:15px;opacity:.85;margin-top:8px}
 
-/* 签到按钮 */
-.sign-btn{
-    display:block;width:100%;
-    padding:16px 0;
-    background:#fff;
-    color:#7c3aed;
-    border:none;border-radius:16px;
-    font-size:18px;font-weight:700;
-    cursor:pointer;
-    transition:transform .1s;
-}
-.sign-btn:active{transform:scale(.97)}
-.sign-btn:disabled{background:rgba(255,255,255,.4);color:rgba(255,255,255,.9);cursor:not-allowed}
-
-/* 7天进度 */
 .progress-box{display:flex;justify-content:space-between;margin:24px 0 8px}
 .day-dot{
     width:34px;height:34px;border-radius:50%;
@@ -57,21 +40,16 @@ body{
     border:1.5px solid rgba(255,255,255,.3);
 }
 .day-dot.on{background:#fff;color:#7c3aed;border-color:#fff}
-.progress-hint{font-size:12px;opacity:.75;text-align:center}
+.progress-hint{font-size:12px;opacity:.75;text-align:center;margin-top:8px}
 
-/* 门票卡片 */
+/* 门票 */
+.ticket-title{font-size:16px;font-weight:700;margin:24px 0 12px;text-align:center}
 .ticket{
     background:#fff;color:#333;border-radius:20px;
     padding:20px;margin-bottom:14px;
     box-shadow:0 10px 30px rgba(0,0,0,.15);
     position:relative;overflow:hidden;
 }
-.ticket::before,.ticket::after{
-    content:'';position:absolute;width:20px;height:20px;
-    background:#6a5cff;border-radius:50%;top:50%;transform:translateY(-50%);
-}
-.ticket::before{left:-10px}
-.ticket::after{right:-10px}
 .ticket--used{opacity:.55;filter:grayscale(.6)}
 .ticket__type{font-size:17px;font-weight:700;color:#7c3aed}
 .ticket__code{font-size:26px;font-weight:800;letter-spacing:4px;margin:10px 0;font-variant-numeric:tabular-nums}
@@ -83,58 +61,43 @@ body{
 }
 .ticket__badge--used{background:#f3f4f6;color:#9ca3af}
 
-.empty-ticket{text-align:center;padding:30px 0;opacity:.8;font-size:14px}
+.empty-ticket{text-align:center;padding:20px 0;opacity:.7;font-size:14px}
 
-/* Toast */
-.toast{
-    position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);
-    background:rgba(0,0,0,.8);color:#fff;padding:14px 24px;
-    border-radius:12px;font-size:15px;z-index:999;
-    opacity:0;pointer-events:none;transition:opacity .2s;
+/* 状态提示 */
+.status-tip{
+    text-align:center;padding:12px;margin-top:16px;
+    background:rgba(255,255,255,.15);border-radius:12px;font-size:13px;
 }
-.toast--show{opacity:1}
 </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
         <span class="logo">书答水 · 签到有礼</span>
-        <a class="back" href="/">返回首页</a>
+        <span class="hint">回复「签到」继续打卡</span>
     </div>
 
     <div class="card">
-        <div class="streak-num" id="streakNum">0</div>
+        <div class="streak-num" id="streakNum">-</div>
         <div class="streak-label">连续签到天数</div>
 
         <div class="progress-box" id="progressBox"></div>
         <div class="progress-hint">连续签到 <b id="needDays">7</b> 天，免费领「全天不限时畅玩门票」</div>
 
-        <button class="sign-btn" id="signBtn" style="margin-top:24px">立即签到</button>
+        <div class="status-tip" id="statusTip">加载中...</div>
     </div>
 
-    <div class="ticket" style="background:transparent;border:1px solid rgba(255,255,255,.25);color:#fff;box-shadow:none;text-align:center">
-        <div style="font-size:16px;font-weight:700;margin-bottom:4px">🎫 我的门票</div>
-    </div>
+    <div class="ticket-title">🎫 我的门票</div>
     <div id="ticketList"></div>
 </div>
 
-<div class="toast" id="toast"></div>
-
 <script>
 const API = 'https://liuyt.pythonanywhere.com';
-const WX_APPID = 'wxbbe6957098d94a79';
-const CALLBACK_URL = 'https://shudashui.com/oauth_callback.html';
 
-let openid = localStorage.getItem('openid') || '';
+// 从 URL 取 token
+const params = new URLSearchParams(window.location.search);
+const token = params.get('token');
 
-function toast(msg){
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('toast--show');
-    setTimeout(()=>t.classList.remove('toast--show'), 2200);
-}
-
-// 渲染进度点
 function renderProgress(streak){
     const box = document.getElementById('progressBox');
     const need = parseInt(document.getElementById('needDays').textContent);
@@ -147,7 +110,6 @@ function renderProgress(streak){
     }
 }
 
-// 渲染门票
 function renderTickets(tickets){
     const list = document.getElementById('ticketList');
     if(!tickets || tickets.length===0){
@@ -165,77 +127,31 @@ function renderTickets(tickets){
     }).join('');
 }
 
-// 加载状态
-async function loadStatus(){
-    if(!openid) return;
+async function load(){
+    if(!token){
+        document.getElementById('streakNum').textContent = '-';
+        document.getElementById('statusTip').textContent = '请从公众号回复「签到」进入';
+        document.getElementById('ticketList').innerHTML = '<div class="empty-ticket">在公众号聊天框回复「签到」即可开始打卡</div>';
+        return;
+    }
     try{
-        const resp = await fetch(API + '/api/signin/status?openid=' + encodeURIComponent(openid));
+        const resp = await fetch(API + '/api/signin/view?token=' + encodeURIComponent(token));
         const data = await resp.json();
         if(data.ok){
             document.getElementById('streakNum').textContent = data.streak;
             document.getElementById('needDays').textContent = data.need_days;
             renderProgress(data.streak);
             renderTickets(data.tickets);
-            document.getElementById('signBtn').disabled = data.today_signed;
-            document.getElementById('signBtn').textContent = data.today_signed ? '今日已签到' : '立即签到';
-        }
-    }catch(e){
-        toast('网络错误，请重试');
-    }
-}
-
-// 签到
-document.getElementById('signBtn').addEventListener('click', async ()=>{
-    if(!openid){ startOAuth(); return; }
-    const btn = document.getElementById('signBtn');
-    btn.disabled = true;
-    btn.textContent = '签到中...';
-    try{
-        const params = new URLSearchParams();
-        params.append('openid', openid);
-        const resp = await fetch(API + '/api/signin/do', {
-            method:'POST',
-            headers:{'Content-Type':'application/x-www-form-urlencoded'},
-            body: params.toString()
-        });
-        const data = await resp.json();
-        if(data.ok){
-            if(data.already){
-                toast('今日已签到');
-            }else{
-                toast('签到成功，已连续 ' + data.streak + ' 天');
-                if(data.ticket){
-                    setTimeout(()=>{
-                        toast('🎉 恭喜获得「'+data.ticket.type+'」！');
-                    }, 1200);
-                }
-            }
-            loadStatus();
+            document.getElementById('statusTip').textContent = data.today_signed ? '✅ 今日已签到' : '今天还没签到，去公众号回复「签到」';
         }else{
-            toast(data.msg || '签到失败');
+            document.getElementById('statusTip').textContent = data.msg || '链接已失效';
         }
     }catch(e){
-        toast('网络错误，请重试');
-    }finally{
-        loadStatus();
+        document.getElementById('statusTip').textContent = '网络错误，请重试';
     }
-});
-
-// 微信授权
-function startOAuth(){
-    const redirect = encodeURIComponent(CALLBACK_URL);
-    const url = 'https://open.weixin.qq.com/connect/oauth2/authorize?appid=' + WX_APPID +
-        '&redirect_uri=' + redirect +
-        '&response_type=code&scope=snsapi_base&state=' + Date.now() + '#wechat_redirect';
-    window.location.href = url;
 }
 
-// 初始化
-if(!openid){
-    document.getElementById('signBtn').textContent = '微信授权后签到';
-}else{
-    loadStatus();
-}
+load();
 </script>
 </body>
 </html>
