@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>我的签到</title>
+<title>签到领门票</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{
@@ -42,6 +42,17 @@ body{
 .day-dot.on{background:#fff;color:#7c3aed;border-color:#fff}
 .progress-hint{font-size:12px;opacity:.75;text-align:center;margin-top:8px}
 
+/* 签到按钮 */
+.sign-btn{
+    display:block;width:100%;margin-top:24px;
+    padding:16px 0;background:#fff;color:#7c3aed;
+    border:none;border-radius:16px;
+    font-size:18px;font-weight:700;cursor:pointer;
+    transition:transform .1s;
+}
+.sign-btn:active{transform:scale(.97)}
+.sign-btn:disabled{background:rgba(255,255,255,.4);color:rgba(255,255,255,.9);cursor:not-allowed}
+
 /* 门票 */
 .ticket-title{font-size:16px;font-weight:700;margin:24px 0 12px;text-align:center}
 .ticket{
@@ -63,11 +74,15 @@ body{
 
 .empty-ticket{text-align:center;padding:20px 0;opacity:.7;font-size:14px}
 
-/* 状态提示 */
-.status-tip{
-    text-align:center;padding:12px;margin-top:16px;
-    background:rgba(255,255,255,.15);border-radius:12px;font-size:13px;
+/* 结果弹窗 */
+.toast{
+    position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);
+    background:rgba(0,0,0,.82);color:#fff;padding:16px 24px;
+    border-radius:14px;font-size:15px;line-height:1.6;text-align:center;
+    z-index:999;opacity:0;pointer-events:none;transition:opacity .2s;
+    max-width:80%;
 }
+.toast--show{opacity:1}
 </style>
 </head>
 <body>
@@ -84,19 +99,27 @@ body{
         <div class="progress-box" id="progressBox"></div>
         <div class="progress-hint">连续签到 <b id="needDays">7</b> 天，免费领「全天不限时畅玩门票」</div>
 
-        <div class="status-tip" id="statusTip">加载中...</div>
+        <button class="sign-btn" id="signBtn" disabled>签到</button>
     </div>
 
     <div class="ticket-title">🎫 我的门票</div>
     <div id="ticketList"></div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
 const API = 'https://liuyt.pythonanywhere.com';
-
-// 从 URL 取 token
 const params = new URLSearchParams(window.location.search);
 const token = params.get('token');
+
+function showToast(msg, ms){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('toast--show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(()=>t.classList.remove('toast--show'), ms || 2500);
+}
 
 function renderProgress(streak){
     const box = document.getElementById('progressBox');
@@ -127,11 +150,21 @@ function renderTickets(tickets){
     }).join('');
 }
 
-async function load(){
+function updateBtn(todaySigned){
+    const btn = document.getElementById('signBtn');
+    if(todaySigned){
+        btn.disabled = true;
+        btn.textContent = '今日已签到';
+    }else{
+        btn.disabled = false;
+        btn.textContent = '立即签到';
+    }
+}
+
+async function loadStatus(){
     if(!token){
         document.getElementById('streakNum').textContent = '-';
-        document.getElementById('statusTip').textContent = '请从公众号回复「签到」进入';
-        document.getElementById('ticketList').innerHTML = '<div class="empty-ticket">在公众号聊天框回复「签到」即可开始打卡</div>';
+        document.getElementById('ticketList').innerHTML = '<div class="empty-ticket">请在公众号聊天框回复「签到」获取签到链接</div>';
         return;
     }
     try{
@@ -142,16 +175,55 @@ async function load(){
             document.getElementById('needDays').textContent = data.need_days;
             renderProgress(data.streak);
             renderTickets(data.tickets);
-            document.getElementById('statusTip').textContent = data.today_signed ? '✅ 今日已签到' : '今天还没签到，去公众号回复「签到」';
+            updateBtn(data.today_signed);
         }else{
-            document.getElementById('statusTip').textContent = data.msg || '链接已失效';
+            showToast(data.msg || '链接已失效');
+            document.getElementById('streakNum').textContent = '-';
         }
     }catch(e){
-        document.getElementById('statusTip').textContent = '网络错误，请重试';
+        showToast('网络错误，请重试');
     }
 }
 
-load();
+// 签到按钮
+document.getElementById('signBtn').addEventListener('click', async ()=>{
+    if(!token){ showToast('请先在公众号回复「签到」'); return; }
+    const btn = document.getElementById('signBtn');
+    btn.disabled = true;
+    btn.textContent = '签到中...';
+    try{
+        const form = new URLSearchParams();
+        form.append('token', token);
+        const resp = await fetch(API + '/api/signin/do', {
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body: form.toString()
+        });
+        const data = await resp.json();
+        if(data.ok){
+            if(data.already){
+                showToast('今日已签到');
+            }else{
+                showToast('✅ 签到成功！已连续 ' + data.streak + ' 天', 3000);
+                if(data.ticket){
+                    setTimeout(()=>{
+                        showToast('🎉 恭喜获得「'+data.ticket.type+'」！\n核销码：'+data.ticket.code, 4000);
+                    }, 1000);
+                }
+            }
+            loadStatus();
+        }else{
+            showToast(data.msg || '签到失败');
+        }
+    }catch(e){
+        showToast('网络错误，请重试');
+    }finally{
+        // 重新加载状态刷新按钮
+        loadStatus();
+    }
+});
+
+loadStatus();
 </script>
 </body>
 </html>
